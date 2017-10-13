@@ -1,0 +1,41 @@
+fminsdp is a code for solving general smooth, non-linear, non-convex optimization 
+problems with both scalar constraints and matrix inequality constraints.
+It attempts to find local solutions to problems of the form
+
+minimize f(x)
+subject to
+A_eq*x = b_eq ............................................... Linear equality constraints
+A*x <= b .......................................................... Linear inequality constraints
+c_eq(x) = 0 ..................................................... Non-linear equality constraints
+c_ineq(x) <= 0 ................................................ Non-linear inequality constraints
+lb <= x <= ub ................................................... Box constraints
+A_i(x) positive semi-definite, i = 1,...,q ........... Matrix inequality constraints,
+
+where A_i, i = 1,...,q, are smooth, non-linear symmetric matrix-valued functions.
+
+The interface to fminsdp is similar to that of fmincon from the Matlab Optimization Toolbox, 
+so anyone familiar with fmincon should recognize the form of the problem treated. 
+The novelty here is the addition of q matrix inequality constraints.
+
+fminsdp offers three different methods to treat the problem. The first two methods
+works by reformulating the problem into a standard non-linear optimization problem (NLP)
+which is then solved by calling fmincon, SNOPT, KNITRO, Ipopt, MMA/GCMMA or PENLAB
+(note that these codes must be obtained separately). The third "method" consists of
+fminsdp calling the external solver PENLAB.
+
+A user's manual in pdf-format and several example codes that illustrate
+usage of fminsdp are provided.
+
+fminsdp has been tested on Matlab R2016a on Windows 7 64-bit and
+Matlab R2012a on Ubuntu 12.10 64-bit. The following NLP-solvers have been tested:
+fmincon from said Matlab releases; Ipopt 3.10.3 and 3.11.2; Knitro 8.1.1; 
+the student version of Snopt 7; MMA/GCMMA, version September 2007; and PENLAB 1.04.
+
+Although this is possible, fminsdp is not intended to replace
+specialized solvers available for many important special cases of the above problem. 
+See http://users.isy.liu.se/johanl/yalmip/pmwiki.php?n=Solvers.Solvers 
+for a list of solvers.
+
+fminsdp can also be used to solve problems without matrix inequality constraints.
+It then simply provides a unified interface, in fmincon-style, to the above-mentioned
+NLP solvers.

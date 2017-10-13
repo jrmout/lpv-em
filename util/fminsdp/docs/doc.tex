@@ -1,0 +1,775 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{mathrsfs}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{alltt}
+\usepackage[numbers]{natbib}
+\usepackage[total={5.8in, 9in},top=1in,left=1.3in]{geometry}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{enumerate}
+
+
+\fancypagestyle{plain}{%
+  \renewcommand{\headrulewidth}{0.001pt}%
+  \fancyhf{}%
+  \fancyfoot[C]{\footnotesize Page \thepage\ of \pageref{LastPage}}%
+}
+
+\lhead{\small Carl-Johan Thore}
+\rhead{\small fminsdp - Optimization with matrix inequality constraints}
+\pagestyle{fancyplain}
+
+
+\newcommand{\bm}[1]{\mbox{\boldmath $#1$}}
+\newcommand{\T}{\textsf{T}}
+\newcommand{\svec}{\mbox{\textsf{svec}}}
+
+\renewcommand{\headrulewidth}{0.002pt}
+
+\hypersetup{bookmarksopen=true}
+
+\title{FMINSDP -- a code for solving optimization problems with matrix inequality constraints \vskip 2mm
+\footnotesize{\url{https://se.mathworks.com/matlabcentral/fileexchange/43643-fminsdp}} \normalsize}
+\date{\today}
+\author{Carl-Johan Thore}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%s
+
+\begin{document}
+
+\maketitle
+
+\thispagestyle{empty}
+
+\noindent This document is a theoretical and practical introduction to the Matlab-code \texttt{fminsdp}, designed to find local solutions to non-linear, non-convex optimization problems (NLPs) with both scalar constraints and (small-size) matrix inequality constraints. 
+\vskip 2mm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\noindent \textbf{Notation.} A matrix $\bm{A} \in \mathbb{R}^{m \times m}$ is said to be \textit{positive semi-definite} if 
+$\bm{y}^{\T}\bm{A}\bm{y} \geq 0$ for all $\bm{y} \in \mathbb{R}^{m}$. It is convenient to introduce
+the notation "$\bm{A} \succeq \bm{0}$" to indicate that $\bm{A}$ is positive semi-definite. A \textit{matrix inequality} is here
+defined as an expression of the form
+\begin{equation}\label{eq:matrix_ineq}
+\bm{\mathcal{A}}(\bm{x}) \succeq \bm{0},
+\end{equation}
+where $\bm{\mathcal{A}}$ is a map from $\Omega \subset \mathbb{R}^{n}$ to the space $\mathbb{S}^{m}$ of symmetric, real-valued matrices of size $m \times m$.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{The optimization problem}
+
+\texttt{fminsdp} attempts to find a local solution to non-linear, non-convex optimization problems of the form
+\begin{equation}\label{eq:problem}
+\quad
+	\begin{aligned}
+	&	\underset{\bm{x}\in\mathbb{R}^{n}}{\mbox{minimize}} \;\; f(\bm{x})  \\
+	&	\mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+			& \bm{A}_{eq}\bm{x} = \bm{b}_{eq} & \mbox{linear equality constraints}      \\
+			& \bm{A}\bm{x} \leq \bm{b}	      & \mbox{linear inequality constraints} \\
+			& \bm{c}_{eq}(\bm{x}) = \bm{0}	 	& \mbox{nonlinear equality constraints}			\\		
+		  & \bm{c}(\bm{x}) \leq \bm{0}			& \mbox{nonlinear inequality constraints}  \\			
+			& \bm{l} \leq \bm{x} \leq \bm{u}	& \mbox{box constraints}\\
+			& \bm{\mathcal{A}}_{i}(\bm{x}) \succeq \bm{0}, \quad i = 1,...,q & \mbox{matrix inequality constraints},
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+\vskip 2mm
+\noindent where $\bm{A}_{eq}$, $\bm{A}$, $\bm{b}_{eq}$, $\bm{b}$, $\bm{l}$ and $\bm{u}$ are constant matrices and vectors, respectively. The functions $f$, $\bm{c}$,  $\bm{c}_{eq}$ and $\bm{\mathcal{A}}_{i}:\Omega_{i} \rightarrow \mathbb{S}^{m_{i}}$, $i = 1,...,q$, can be non-linear and are (preferably) at least 
+twice continuously differentiable. Users familiar with \texttt{fmincon} from the Optimization Toolbox in Matlab \cite{fmincon:60} should recognize the 
+form of problem \eqref{eq:problem} --- the novelty here is the addition of $q$ matrix inequality constraints. 
+
+\texttt{fminsdp} offers three different methods to treat problem \eqref{eq:problem}: the ''cholesky-method'', the ''ldl-method'' \cite{Bogani:2009} and ''penlab'' \cite{Fiala:2013}. The first two methods works by reformulating the problem into a standard NLP which can be solved by any of the NLP-solvers interfaced by \texttt{fminsdp}. The third method relies on the external solver PENLAB\footnote{Downloadable from \url{http://web.mat.bham.ac.uk/kocvara/penlab/}.}, which treats the problem directly using an augmented Lagrangian-type algorithm \cite{Fiala:2013}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Theoretical background}
+
+\subsection{The cholesky-method}
+
+In the cholesky-method, \texttt{fminsdp} reformulates the matrix inequality constraints into scalar equality constraints using the fact that a matrix is positive semi-definite if and only if it admits a Cholesky decomposition. In other words, 
+\vskip 2mm
+\noindent \textbf{Theorem 1.} A symmetric matrix $\bm{A} \succeq \bm{0}$ if and only if
+\begin{equation}\nonumber
+\bm{A} = \bm{L}\bm{L}^{\T}
+\end{equation}
+for some lower triangular matrix $\bm{L}$. 
+\vskip 2mm
+\noindent By default in \texttt{fminsdp}, $\bm{L}$ is restricted to the space of lower triangular $m \times m$-matrices with non-negative diagonal elements, referred to as $\mathcal{L}^{m}$. Non-negativity of the diagonal elements is not required by the theory, but enforcement of this condition is often important for computational efficiency.
+
+\texttt{fminsdp} makes use of the function $\svec : \mathbb{R}^{m\times m} \rightarrow \mathbb{R}^{p}$, where $p$ denotes the number of  non-zero elements in the Cholesky factor $\bm{L}$ of a given matrix; i.e., the number of elements in the sparsity pattern of $\bm{L}$, obtained by a \textit{symbolic} Cholesky factorization of the given matrix. $\svec$ takes, column-wise, the elements of the input matrix corresponding to potential non-zeros of $\bm{L}$ and stacks them on top of each other to form a vector of length $p$. If the lower triangular part of $\bm{L}\in\mathcal{L}^{m}$ is full we have $p=m(m+1)/2$ and
+\begin{equation}\nonumber
+\svec(\bm{A}) = (A_{11},A_{21},\ldots,A_{m1},A_{22},\ldots,A_{m2},\ldots,A_{mm})^{\T};
+\end{equation}
+i.e., the vector $\svec(\bm{A})$ contains the elements of the lower triangular part of $\bm{A}$. 
+
+Now, based on Theorem 1, problem \eqref{eq:problem} is reformulated into the following problem:
+\begin{equation}\label{eq:problem2}
+\quad
+	\begin{aligned}
+	&	\underset{\bm{x}\in\mathbb{R}^{n},\; \bm{\ell}_{1}\in\mathbb{R}^{p_{1}},\;\ldots ,\;\bm{\ell}_{q}\in\mathbb{R}^{p_{q}}}{\mbox{minimize}} \;\; f(\bm{x})  \\
+	&	\mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+			& \bm{A}_{eq}\bm{x} = \bm{b}_{eq} &\\
+			& \bm{A}\bm{x} \leq \bm{b}	      &\\
+			& \bm{c}_{eq}(\bm{x}) = \bm{0}	 	&\\
+		  & \bm{c}(\bm{x}) \leq \bm{0}			&\\
+			& \bm{l} \leq \bm{x} \leq \bm{u}	&\\
+			& \tilde{\bm{l}} \leq (\bm{\ell}_{1},\ldots,\bm{\ell}_{q}) \leq \tilde{\bm{u}} & \\
+			& \svec\left(\bm{\mathcal{A}}_{i}(\bm{x}) - \bm{L}_{i}(\bm{\ell}_{i})\bm{L}_{i}(\bm{\ell}_{i})^{\T}\right) = \bm{0}, & \quad i = 1,...,q \\
+			& \mbox{\textsf{diag}}\{\bm{L}_{i}(\bm{\ell}_{i})\} \geq \bm{0}, & \quad i = 1,...,q,
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+where the variables $\bm{\ell}_{i}$ defining the non-zero elements of the Cholesky factors are referred to as \textit{auxiliary variables}, $\tilde{\bm{l}}$ are $\tilde{\bm{u}}$ are constant vectors, and $\mbox{\textsf{diag}}$ returns a vector containing the diagonal elements of a matrix. This problem is in a form amenable to direct treatment by an NLP-solver, and this is the problem to which \texttt{fminsdp} attempts to find a local solution.
+
+\vskip 2mm
+\noindent \textbf{Note.} Any local minimum of problem \eqref{eq:problem2} is also a local minimum for \eqref{eq:problem}, and vice versa (assuming that bounds on the auxiliary variables do not prevent this). However, problem \eqref{eq:problem2} may have additional stationary points not present in \eqref{eq:problem}. The author has not experienced any difficulties obviously attributed to this fact, but it cannot be ruled out that it might cause trouble on some problems.
+\vskip 2mm
+
+A key motivation behind \texttt{fminsdp} is to abstract away the exact treatment of the matrix inequality constraints so that the user only ''sees'' a problem of the form \eqref{eq:problem}; that is, the user should not have to deal with the Cholesky factors and the auxiliary variables. Thus, when using \texttt{fminsdp} one only works with the primary variables $\bm{x}$, and user-supplied derivatives are only with respect to $\bm{x}$. The examples in Section \ref{sec:tutorial} and the folder \texttt{examples} shows how this is done in practice.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{The ldl-method}
+
+In the ldl-method \cite{Vanderbei:2000,Bogani:2009}, \texttt{fminsdp} reformulates the matrix inequality constraints into scalar inequality constraints using the fact that a matrix is positive semi-definite if and only if the diagonal elements in an LDL-factorization of the matrix is non-negative. In other words, 
+\vskip 2mm
+\noindent \textbf{Theorem 2.} A symmetric $m\times m$-matrix $\bm{A} \succeq \bm{0}$ if and only if
+\begin{equation}
+d_{i}(\bm{A}) \geq 0, \quad i=1,\ldots,m,
+\end{equation}
+where $d_{i}(\bm{A})$ are the diagonal elements in an LDL-factorization of $\bm{A}$.
+\vskip 2mm
+The original problem \eqref{eq:problem} is now replaced by
+\begin{equation}\label{eq:problemldl}
+\quad
+	\begin{aligned}
+	&	\underset{\bm{x}\in\mathbb{R}^{n}}{\mbox{minimize}} \;\; f(\bm{x})  \\
+	&	\mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+			& \bm{A}_{eq}\bm{x} = \bm{b}_{eq} &\\
+			& \bm{A}\bm{x} \leq \bm{b}	      &\\
+			& \bm{c}_{eq}(\bm{x}) = \bm{0}	 	&\\
+		  & \bm{c}(\bm{x}) \leq \bm{0}			&\\
+			& \bm{l} \leq \bm{x} \leq \bm{u}	&\\
+			& d_{ij}(\bm{\mathcal{A}}_{i}(\bm{x})) \geq 0, \quad j=1,\ldots,m_{i},\; i=1,\ldots,q ,  &
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+
+The functions $d_{ij} : \mathbb{S}^{m} \rightarrow \mathbb{R}$ are smooth, and concave, on the set of positive
+definite matrices \cite{Vanderbei:2000}, so provided $\bm{\mathcal{A}}_{i}(\bm{x})$ are always positive definite,
+\eqref{eq:problemldl} is a smooth NLP. In practise, even if $\bm{\mathcal{A}}_{i}(\bm{x})$ are all positive definite at the initial point (see section \ref{sec:infeasible}), this property can not be ensured throughout the optimization process without taking
+special measures. When using \texttt{fmincon} the line search step-length can be reduced until, due to continuity, $\bm{\mathcal{A}}_{i}(\bm{x})$ is positive definite. When using the NLP-solver \texttt{gcmma} the subproblems are made more conservative to reach the same effect. 
+
+Compared to the cholesky-method, the ldl-method introduces no additional variables, but requires, e.g., shortening of the search step in line-search procedures, and derivatives of the matrix constraints can be more expensive to compute. 
+
+When using NLP-solver \texttt{gcmma} the computational cost can sometimes be reduced significantly by using an active-set approach \cite{Bogani:2009} where the gcmma subproblem only takes into accounts those constraints which satisfies 
+\begin{equation}\nonumber
+d_{ij}(\bm{\mathcal{A}}_{i}(\bm{x})) \leq \eta,
+\end{equation}
+where $\eta$ is a positive constant. This approach can be efficient for problems with low-rank solutions, and is activated by setting the option \texttt{eta} (see Section \ref{sec:options}) to some suitable value.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Penlab}
+
+The reader is referred to \cite{Fiala:2013} and references therein for a description of the algorithm implemented in PENLAB.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Infeasible initial points}
+\label{sec:infeasible}
+
+It is recommended that the user supplies an initial point which is feasible with respect to the constraints of problem \eqref{eq:problem}, in particular the matrix inequality constraints. If the latter is not possible, an option can be set (see section \ref{sec:options}) so that \texttt{fminsdp} attempts to solve the following problem in place of \eqref{eq:problem}:
+\begin{equation}\label{eq:problem3}
+\quad
+	\begin{aligned}
+	&	\underset{\bm{x}\in\mathbb{R}^{n},\; \mbox{$s$}\in\mathbb{R}}{\mbox{minimize}} \;\; f(\bm{x}) + cs \\
+	&	\mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+			& \bm{A}_{eq}\bm{x} = \bm{b}_{eq} &\\
+			& \bm{A}\bm{x} \leq \bm{b}	      &\\
+			& \bm{c}_{eq}(\bm{x}) = \bm{0}	 	&\\
+		  & \bm{c}(\bm{x}) \leq \bm{0}			&\\
+			& \bm{l} \leq \bm{x} \leq \bm{u}	&\\
+			& \bm{\mathcal{A}}_{i}(\bm{x}) + s\bm{I}^{m_{i}} \succeq \bm{0}, & \quad i = 1,...,q \\
+			& \underline{s} \leq s \leq \overline{s}. & 
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+Here $s$ is an auxiliary variable, $\bm{I}^{m_{i}},\, i = 1,...,q$, are identity matrices of size $m_{i} \times m_{i}$, and
+$\underline{s}$ and $\overline{s}$ are constants. The constant $c$ appearing in the objective should be set to some large positive number (finding a suitable value might require experimenting a bit) such that $s$ becomes close to zero at a solution. 
+
+Unless the user specifies something else, given $\bm{x}_{0}$ \texttt{fminsdp} will generate an initial value for the auxiliary variable according to
+\begin{equation}\nonumber
+s_{0} = \max_{i=1,\ldots,q}\Big(-\min \,\{\lambda_{1}(\mathcal{A}_{i}(\bm{x}_{0})),-10^{-12}\}\Big),
+\end{equation}
+where $\lambda_{1}(\cdot)$ returns the smallest eigenvalue of a matrix. This guarantees that $\bm{\mathcal{A}}_{i}(\bm{x}_{0}) + s_{0}\bm{I}^{m_{i}} \succ \bm{0}$ for all $i$.
+
+\vskip 2mm
+\noindent \textbf{Note.} The ldl-method requires a feasible initial point, so if you're unable to supply such a point you must set $c > 0$. The cholesky- and penlab-methods do not require a feasible initial point.
+
+
+ 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Problem size and some limitations}
+
+Assuming the constraint matrices are of small size or very sparse, \texttt{fminsdp} might be able to solve large-scale problems within reasonable time. The ldl-method might also work for problems involving large constraint matrices. For the cholesky-method, one can expect a fairly large number of auxiliary variables and thus many non-zero elements in the constraint Jacobian (and Hessian of the Lagrangian), resulting in much memory and CPU time being devoted to solution of linear systems by the NLP solver used to solve \eqref{eq:problem2}. Penlab, finally, relies on exact second-derivative information which can make problems costly to solve.
+
+Here are some additional things to note:
+\begin{enumerate}
+\item NLP-solvers ipopt, knitro, snopt, penlab, mma and gcmma must be downloaded and installed separately. 
+\item Penlab requires a user-supplied function for evaluating the Hessian of the Lagrangian.
+\item The ldl-method can currently not make use of a user-supplied Hessian of the Lagrangian and has
+      only been tested with NLP-solvers fmincon and gcmma.     
+\item Although it is possible to improve performance by implementing parts of the code as MEX-functions, \texttt{fminsdp} is a pure Matlab-code. The reason is to make installation, set up and maintenance as easy as possible.
+The interested user could try out the Matlab-function \texttt{profile} to identify bottlenecks in the code and
+implement them as MEX-functions instead. 
+\end{enumerate}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Alternatives}
+
+There are many important special cases of problem \eqref{eq:problem} for which specialized solvers 
+are available. Although this is possible, \texttt{fminsdp} is not intended to replace such solvers, which, 
+when applicable, can be a lot faster.
+
+The following is an incomplete list of currently available solvers:
+\begin{itemize}
+\item Problems with linear matrix inequality (LMI) constraints:\\
+\hskip2mm SeDuMi, SDPT3, SDPA, LMI Lab, PENSDP, BMISolver, PENBMI, PENNON
+\item Problems with bilinear matrix inequality (BMI) constraints:.\\
+\hskip2mm BMISolver, PENBMI, PENNON, PENLAB
+\item General problems of type \eqref{eq:problem}:\\
+\hskip2mm PENNON, PENLAB
+\end{itemize}
+Note that except for PENNON, and its open-source version PENLAB, there are additional constraints on the structure of the problems treated by the listed solvers.
+
+The Matlab code YALMIP \cite{Yalmip:2004} provides a convenient unified interface to the solvers listed above (except BMISolver).
+
+One could of think of other criteria, not without drawbacks of course, for positive semi-definiteness beside the ones used here that might be used to obtain a standard NLP formulation of \eqref{eq:problem}. Non-negativity of the smallest eigenvalue or of the leading principle minors of a matrix are both necessary and sufficient criteria. If one is satisfied with sufficiency, diagonal dominance could also be considered.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+\section{Using \texttt{fminsdp}}
+\label{sec:using}
+
+A user of \texttt{fminsdp} is expected to provide two functions; one for evaluating the objective function (i) and one for evaluating the non-linear constraints (ii):
+\begin{enumerate}[i.]
+\item \texttt{[fval,\textit{grad}] = objfun(x)}
+\item \texttt{[cineq,ceq,\textit{cineqgrad},\textit{ceqgrad}] = nonlcon(x)}
+\end{enumerate}
+(Here and in the following it is assumed that the reader is familiar with the Matlab syntax.) The return arguments written in italics are optional and only needed if the user wishes to provide gradients for the objective and constraints. The matrix inequality constraints are defined in the non-linear constraints function (even linear matrix inequalities). The values of the constraint matrices, vectorized using \svec, are returned as the last elements in the output vector \texttt{ceq}; see Section \ref{sec:tutorial} for an example.
+
+In addition to objective and non-linear constraints functions, the user may optionally provide a function for evaluating
+the Hessian of the Lagrangian:
+\begin{itemize}
+\item \texttt{H = hessian(x,lambda)},
+\end{itemize}
+where \texttt{lambda} is a struct with two fields \texttt{ineqnonlin} and \texttt{eqnonlin} containing values of the Lagrange
+multipliers associated with the non-linear inequality and equality constraints, respectively, and one field \texttt{sigma} 
+which only used when running with NLP-solver Ipopt.
+
+The calling syntax of \texttt{fminsdp} is similar to that of \texttt{fmincon}:
+\begin{verbatim}
+>> [x,fval,exitflag,output,lambda,grad,hessian] = ...
+										                        fminsdp(objfun,x0,A,b,Aeq,beq,lb,ub,nonlcon,options)
+\end{verbatim}
+Unlike fmincon, at least 9 input arguments are required. If your problem has no linear constraints and no simple
+bounds, the corresponding input arguments can be set to empty matrices. Note that \texttt{fminsdp} does not
+support passing additional arguments to the objective or constraint functions through an 11-th input argument. 
+To pass additional arguments to the user-supplied functions one should use anonymous or nested functions.
+
+\subsection{Options}
+\label{sec:options}
+A number of options are available when calling \texttt{fminsdp}. These are passed to the code in the form of a struct containing
+parameter-value pairs. The most convenient way to specify options is to use the function \texttt{sdpoptionset}:
+\begin{verbatim}
+>> options = sdpoptionset('MatrixInequalities',true);
+\end{verbatim}
+
+In addition to the options accepted by the function \texttt{optimset} from the Matlab Optimization Toolbox, the
+following options are available when calling \texttt{fminsdp}:
+\vskip 2mm
+\noindent \texttt{MatrixInequalities}  \hskip 1cm logical scalar\\
+Indicates whether or not the problem has any matrix inequality constraints. If not, \texttt{fminsdp} will simply call the 
+NLP solver specified using options.NLPsolver.\\
+\noindent  Default: true 
+\vskip 2mm
+\noindent \texttt{Aind}  \hskip 3.5cm scalar or numeric array\\
+Marks the beginning of each matrix constraint in the vector \texttt{ceq} returned from the non-linear constraints function. If
+the option \texttt{sp\_pattern}, described below, is used it is only necessary to mark the beginning of the \texttt{first} matrix 
+constraint.\\
+\noindent  Default: 1
+\vskip 2mm
+\noindent \texttt{method} \hskip 3.0cm \{'cholesky', 'ldl', 'penlab'\} \\
+Select treatment of matrix inequality constraints. \\
+Default: 'cholesky'
+\vskip 2mm
+\noindent \texttt{NLPsolver} \hskip 2.5cm  \{'fmincon', 'ipopt', 'snopt', 'knitro', 'mma', 'gcmma'\}               \\
+Select NLP-solver (not applicable if \texttt{method}='penlab'). Interfaces are provided to fmincon, Ipopt \cite{Wachter:2006}, SNOPT \cite{Gill:2002}, KNITRO \cite{Byrd:2006}, MMA/GCMMA \cite{Svanberg:2007}, and PENLAB.
+NOTE: If you run Ipopt older than 3.11.0, make sure to modify the file ipopt\_main.m appropriately. \\
+Default: 'fmincon'
+\vskip 2mm
+\noindent \texttt{max\_cpu\_time}  \hskip 2.1cm positive scalar \\
+Maximum CPU time. Applicable to NLP-solvers fmincon, ipopt, mma and gcmma.\\
+Default: inf       
+\vskip 2mm
+\noindent \texttt{sp\_pattern}  \hskip 2.3cm  (sparse) matrix or cell array of matrices\\
+Sparsity patterns of the  matrix constraints. If this option is used, the user must provide one matrix for each matrix constraint. 
+\\
+\noindent  Default: []
+\vskip 2mm
+\noindent \texttt{L0} \hskip 3.2cm  (sparse) matrix  or cell array of matrices \\
+Initial guess for the Cholesky factors of the matrix constraints. If the user does not provide an initial
+guess, \texttt{fminsdp} will generate one by attempting a Cholesky factorization of the constraint matrices 
+at the initial point. If this fails, \texttt{fminsdp} will add a multiple of the identity matrix to
+the constraint matrices until all of them are positive definite and use the Cholesky factorizations of these
+matrices as an initial guess. \\
+Default: []
+\vskip 2mm
+\noindent \texttt{Ldiag\_low} \hskip 2cm  scalar or numeric array	\\
+Lower bound(s) on the diagonal elements of the Cholesky factors. \\
+Default: 0
+\vskip 2mm
+\noindent \texttt{L\_low} \hskip 2.75cm   scalar or array of doubles \\
+Lower bound(s) on the off-diagonal element of the Cholesky factors \\
+Default: -inf
+\vskip 2mm
+\noindent 
+\texttt{L\_upp} \hskip 2.75cm  scalar or array of doubles \\
+Upper bound(s) on the elements of the Cholesky factors (including the diagonal elements).\\
+Default: inf
+\vskip 2mm
+\noindent 
+\texttt{eta} \hskip 3.1cm  positive scalar  \\
+Tolerance for determining the active set when using the ldl-method with NLP-solver gcmma.\\
+Default: inf
+\vskip 2mm
+\noindent 
+\texttt{c} \hskip 3.47cm  non-negative scalar    \\
+If $c>0$, \texttt{fminsdp} attempts to solve problem \eqref{eq:problem3} instead of 
+\eqref{eq:problem}. The user may in this case also let the objective function be empty; i.e., the first input argument to \texttt{fminsdp} can be set to '[]'. This is useful when one wants to check feasibility of one or more matrix inequalities. \\
+Default: 0
+\vskip 2mm
+\noindent
+\texttt{s\_low}   \hskip 2.8cm        scalar      \\
+Lower bound on the auxiliary variable $s$ in problem \eqref{eq:problem3}.\\
+Default: 0
+\vskip 2mm
+\noindent
+\texttt{s\_upp}   \hskip 2.8cm        scalar      \\
+Upper bound on the auxiliary variable $s$ in problem \eqref{eq:problem3}.\\
+Default: inf
+\vskip 2mm
+\noindent
+\texttt{HessianCheck} \hskip 1.4cm   \{'on', 'off'\} \\      
+Simple check of Hessian of the Lagrangian against finite differences at the initial point. 
+Assumes you have the code DERIVEST, which must be obtained separately, on your Matlab path. 
+This check can be very time consuming and should preferably be carried out on small instances of 
+a problem.\\
+Default: 'off'
+\vskip 2mm
+\noindent
+\texttt{HessMult} \hskip 2cm   \{function\_handle, 'on'\} \\
+If using fmincon with \texttt{options.SubProblemAlgorithm = 'cg'}, you can work with Hessian 
+times vector products directly, thereby avoiding the formation of the full Hessian of
+the Lagrangian. Set to a function handle or simply to 'on' if the Hessian of
+the Lagrangian with respect to the primary variables is zero. Only applicable when using the cholesky-method. \\
+Default: []
+\vskip 2mm
+\noindent
+\texttt{ipopt} \hskip 2.7cm     struct   \\
+Options to be passed on to NLP solver Ipopt. Please refer to the Ipopt documentation for a
+list of available options. \\
+Default: []
+\vskip 2mm
+\noindent
+\texttt{eigs\_opts} \hskip 2.1cm       struct    \\
+Options passed to the Matlab function \texttt{eigs} used for eigenvalue computations. \\
+Default: struct('isreal',true,'issym',true)
+\vskip 2mm
+\noindent
+\texttt{KnitroOptionsFile} \hskip 0.5cm  character array \\
+Name of an options file to be read by NLP solver KNITRO. Please refer to the KNITRO
+documentation for a list of available options.\\
+Default: []
+\vskip 2mm
+\noindent
+\texttt{SnoptOptionsFile} \hskip 0.6cm   character array \\
+Name of an options file to be read by NLP solver SNOPT. Please refer to the SNOPT
+documentation for a list of available options.\\
+Default: []
+\vskip 2mm
+\noindent
+\texttt{GradPattern} \hskip 1.5cm        numeric array   \\
+Sparsity pattern for the gradient of the objective function. Only used by NLP solver SNOPT and 
+only effective if you also set \texttt{options.JacobPattern} (see the fmincon documentation for
+details on the latter). \\
+Default: []
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\subsection{Output}
+
+The available output arguments from \texttt{fminsdp} are the same as those of fmincon:
+\begin{verbatim}
+>> [x,fval,exitflag,output,lambda,grad,hessian] = fminsdp(...)
+\end{verbatim}
+The only difference is that the struct \texttt{output}, the fourth output argument, contains
+some additional fields (some are only available when running the cholesky-method):
+\vskip 3mm
+\noindent
+\texttt{A} \hskip 4.2cm        cell array of matrices  \\
+Constraint matrices evaluated at the solution \texttt{x}. 
+\vskip 2mm
+\noindent
+\texttt{L} \hskip 4.2cm        cell array of matrices  \\
+Cholesky factors of the constraint matrices evaluated at the solution \texttt{x}. These are computed
+by assembling each $\bm{L}_{i}$ from the variable vector $\bm{\ell}_{i}$ and not by a Cholesky factorization
+of the corresponding constraint matrix.
+\vskip 2mm
+\noindent
+\texttt{L0} \hskip 4.0cm        cell array of matrices  \\
+Cholesky factors of the constraint matrices evaluated at the initial point \texttt{x0}.
+\vskip 2mm
+\noindent \texttt{nxvars}		\hskip 3.2cm 		numeric scalar \\
+Number of primary variables.
+\vskip 2mm
+\noindent \texttt{nLvars}		\hskip 3.2cm     numeric scalar \\
+Number of auxiliary variables.
+\vskip 2mm
+\noindent \texttt{A\_size}   \hskip 3.3cm     numeric array \\
+Size of the constraint matrices; i.e., $m_{i}$ in \eqref{eq:problem2}.
+\vskip 2mm
+\noindent \texttt{nMatrixConstraints}   \hskip 1cm     numeric scalar \\
+Number of matrix constraints.
+\vskip 2mm
+\noindent \texttt{NLPsolver}   \hskip 2.7cm     string \\
+Selected NLP solver.
+\vskip 3mm
+It the user has set \texttt{options.c} to some positive number in order to solve problem \eqref{eq:problem3},
+then two additional fields are available:
+\vskip 3mm
+\noindent \texttt{s0}   \hskip 2.7cm     double scalar \\
+Initial value for the auxiliary variable $s$.
+\vskip 2mm
+\noindent \texttt{s}   \hskip 2.9cm     double scalar \\
+Value of $s$ at the solution.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{A tutorial example}
+\label{sec:tutorial}
+
+To aid the user, a very simple tutorial example is provided here. For more details, please refer to the examples 
+found in the \texttt{examples}-folder. 
+
+Consider the following (non-sense) problem:
+\begin{equation}\label{eq:tutorial}
+\quad
+	\begin{aligned}
+    & \underset{\bm{x}\in\mathbb{R}}{\mbox{minimize}} \;\;  x^{2}  \\
+	& \mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+			& x^{3} = 0 	\\
+		    & x^{2} \leq 0			\\
+			& \left(
+			\begin{array}{cc}
+					x   & x^2 \\
+			        x^2 & 0
+			      \end{array}
+			\right) \succeq \bm{0}		
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+To solve this problem using \texttt{fminsdp} we need to implement at least two functions:
+
+\begin{enumerate} 
+\item The objective function:
+\begin{verbatim}
+function [fval,grad] = objfun(x)
+fval = x^2;
+if nargout>1 
+   grad = 2*x;
+end
+\end{verbatim}
+
+\item The non-linear constraints function:
+\begin{verbatim}
+function [cineq,ceq,cineqgrad,ceqgrad] = nonlcon(x)
+cineq = x^2;
+ceq = [x^3; svec([x x^2; x^2 0]))];
+if nargout>2
+   cineqgrad = 2*x;
+   ceqgrad = [3*x^2 svec([1 2*x; 2*x 0])'];
+end
+\end{verbatim}
+
+\end{enumerate}
+
+\noindent A function for evaluating the Hessian of the Lagrangian is optional, but recommended. One
+such function is given here:
+\begin{verbatim}
+function H = hessian(x, lambda)
+H = lambda.ineqnonlin*2 + lambda.eqnonlin(1)*6*x  + ...
+    lambda.eqnonlin(2:end,1)'*svec([0 2; 2 0]));
+\end{verbatim}
+
+Using the functions specified above, a simple script to solve problem \eqref{eq:tutorial} can now be written:
+
+\begin{verbatim}
+
+% Mark the beginning of the matrix inequality constraints in the vector ceq 
+% returned from nonlcon
+options.Aind = 2;
+
+% Specify that analytical gradients should be used
+options.GradObj = 'on';
+options.GradConstr = 'on';
+
+% Specify that the function "hessian" should be used for the
+% Hessian of the Lagrangian
+options.Hessian = 'user-supplied'
+options.HessFcn = @(x,lambda) hessian(x,lambda);
+
+% Specify initial point
+x0 = 1;
+
+% Call fminsdp
+[x,fval] = fminsdp(objfun,x0,[],[],[],[],[],[],nonlcon,options);
+				   
+\end{verbatim}	
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+\section{Practicalities}
+\label{sec:practicalities}
+
+For a given problem there are usually a number of things that can be done to improve numerical performance. One can, for instance, try out various scalings or introduce new variables and constraints to reduce the degree of non-linearity. Here are some additional tips: 
+
+\vskip 5mm
+\noindent\textbf{Exploit sparsity}
+\vskip 2mm
+\noindent In many cases, the functions $\bm{\mathcal{A}}_{i}$, $i = 1,...,q$, are sparse in the sense that the matrix $\bm{\mathcal{A}}_{i}(\bm{x})$
+is sparse for every $\bm{x}$. This fact can be exploited to reduce the number of auxiliary variables and nonlinear constraints for the cholesky-method.
+
+To take advantage of sparsity, the user should compute the sparsity pattern of each matrix constraint (or
+an (pessimistic) estimate thereof) and supply this to \texttt{fminsdp} via the option \texttt{sp\_pattern}. For the
+dummy problem in Section \ref{sec:tutorial} we simply add two lines to the driver script:
+\begin{verbatim}
+sp_A = [1 1; 1 0]					  		        % Sparsity pattern of the constraint matrix
+options.sp_pattern = sp_A;
+
+...
+
+[x,fval] = fminsdp(@(x) objfun(x),x0,[],[],[],...
+				   [],[],[],@(x) nonlcon(x),options);
+
+\end{verbatim}
+
+
+\vskip 2mm
+\noindent\textbf{Add artificial upper and lower bounds}
+\vskip 2mm
+\noindent Even though some of the variables in your problem has no  ''natural'' bounds on them, it is usually wise
+to add upper and lower bounds. These bounds should of course be loose enough to not exclude any solution of 
+interest, but even if they don't, setting them too tight might have a negative impact on the solution process.
+Therefore, a bit of experimenting is recommended.
+
+Bounds on the auxiliary variables in the cholesky-method can be specified by setting \texttt{options.L\_low} and \texttt{options.L\_upp}. Sometimes it is easy to derive
+suitable bounds \textit{a priori} \cite{Thore:2015}.
+
+
+\vskip 5mm
+\noindent\textbf{Experiment with various solvers and algorithms}
+\vskip 2mm
+\noindent \texttt{fminsdp} can use fmincon, SNOPT, KNITRO, Ipopt, mma, gcmma and PENLAB to solve problems \eqref{eq:problem2}. In addition, fmincon
+and KNITRO lets the user choose between three different algorithms (two interior-point and one sqp). It is unlikely that a single solver and/or algorithm is best suited for all types of problems so it is recommended that the user experiment with various 
+alternatives. The author's experience is that the interior-point method of fmincon (selected by setting \texttt{options.Algorithm='interior-point'} and \texttt{options.SubProblemAlgorithm = 'ldl-factorization'}) works well in
+terms of the number of function evaluations, but that more efficient handling of the linear algebra makes the other solvers 
+better suited for larger problems.
+
+\vskip 5mm
+\noindent\textbf{Provide gradients and Hessian of the Lagrangian}
+\vskip 2mm
+\noindent Providing code that computes gradients and the Hessian of the Lagrangian is usually a good idea (if you use Ipopt you \textit{must} provide code for evaluating gradients; SNOPT does not make use of code for evaluating the Hessian of the Lagrangian). Due to the homogeneity of $\svec$ one has simply
+\begin{equation}\nonumber
+\frac{\partial \svec(\bm{\mathcal{A}})}{\partial x_{i}} = \svec\left(\frac{\partial \bm{\mathcal{A}}}{\partial x_{i}}\right),
+\end{equation}
+and for a function $L(\bm{x}) = \bm{\lambda}^{\T}\svec(\bm{\mathcal{A}}(\bm{x}))$,
+\begin{equation}\nonumber
+\frac{\partial^2 L}{\partial x_{i}\partial x_{j}} =  \bm{\lambda}^{T}\svec\left(\frac{\partial^2 \bm{\mathcal{A}}}{\partial x_{i}\partial x_{j}}\right).
+\end{equation}
+
+The user is strongly recommended to check the correctness of the derivatives by comparing against finite-difference 
+approximations. This can be done by setting \texttt{options.DerivativeCheck='on'} and \texttt{options.HessianCheck='on'}. 
+If necessary, the accuracy of the finite-difference approximations in \texttt{fmincon} can be increased by setting
+\texttt{options.FinDiffType='central'}.
+
+If you use NLP solvers SNOPT, Ipopt or KNITRO, you can also provide sparsity patterns for the constraint Jacobian, and Ipopt
+and KNITRO can also exploit a sparsity pattern for the Hessian of the Lagrangian. Sparsity patterns are passed to the solvers
+by setting \texttt{options.JacobPattern} and \texttt{options.HessPattern} to sparse matrices.
+
+As an alternative to deriving and implementing derivatives one might consider using automatic differentiation, which provides 
+derivatives with accuracy to machine precision, and, at least in principle, does so completely automatically.
+
+   
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Examples}
+
+This section comprise a brief description of three problems concerned with structural optimization of (plane) trusses. Implementations of the example problem can be found in the folder \texttt{examples}.\footnote{Note that there are often many different ways to formulate such problems \cite{Cristensen:2009,Bendsoe:1994}, and formulations other than those given here may certainly be better suited to one's needs. Here, however, we are specifically interested in solving problems with matrix inequality constraints.}
+
+Let $n_{d} = 2$ be the number of spatial dimensions, $N$ the number of nodes in the truss, and $n_{fixed}$ the number of prescribed (to zero) displacement components. The number of displacement degrees of freedom is $n=n_{d}N-n_{fixed}$ and there are $m$ potential bars in the truss.
+The $m$ bar volumes are collected in a vector $\bm{x}\geq\bm{0}$ which is used to parametrize the design of the truss. Assuming (infinitesimally) small deformations and a quasi-static situation, the nodal displacement vector $\bm{u}\in\mathbb{R}^{n}$ satisfies the equilibrium equation
+\begin{equation}\label{eq:equlibrium}
+\bm{K}(\bm{x})\bm{u} = \bm{f},
+\end{equation}
+where $\bm{K}(\bm{x})$ is known as the stiffness matrix and $\bm{f}\in\mathbb{R}^{n}$ contains forces applied to the nodes. The  stiffness matrix is given by
+\begin{equation}\nonumber
+\bm{K}(\bm{x}) = \sum_{i=1}^{m}x_{i}E_{i}\bm{b}_{i}\bm{b}_{i}^{\T},
+\end{equation}
+where $x_{i}$ is the volume of the $i$:th bar, $E_{i}$ the Young's modulus, and the vectors $\bm{b}_{i}$ depend on the geometry of the undeformed truss. Clearly, $\bm{K}(\bm{x})$ is positive semi-definite and symmetric. Assuming rigid body motions are prevented, by appropriate support conditions, and $\bm{x}>\bm{0}$, it is even positive definite.
+\vskip2mm
+\noindent\textbf{1.} The first problem in the \texttt{examples}-folder is to minimize the volume of a truss subject to the equilibrium condition \eqref{eq:equlibrium} and an upper bound $c$ on the so-called compliance $\bm{f}^{\T}\bm{u}$. This can be formulated as a problem involving a single LMI: 
+\begin{equation}\label{eq:prob1}
+\quad
+	\begin{aligned}
+	&	\underset{\bm{x}\in\mathbb{R}^{m}}{\mbox{minimize}} \;\; \sum_{i=1}^{m}x_{i} \\
+	&	\mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+		  & \left(
+\begin{array}{cc}
+c &\bm{f}^{\T}         \\
+\bm{f} & \bm{K}(\bm{x})
+\end{array}
+\right) \succeq \bm{0} \\
+			& x_{i} \geq 0 , \quad i=1,\ldots,m.
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+
+\vskip2mm
+\noindent\textbf{2.} 
+A drawback of problem \eqref{eq:prob1} is that optimized structures may be unstable in the sense that they are prone to global buckling. One way to avoid many such designs is to impose an additional constraint \cite{Kocvara:2002} requiring that
+\begin{equation}\label{eq:stability}
+\bm{K}(\bm{x}) + \bm{G}(\bm{u}(\bm{x}),\bm{x}) \succeq \bm{0},
+\end{equation}
+where the geometrix stiffness matrix
+\begin{equation}\nonumber
+\bm{G}(\bm{u}(\bm{x}),\bm{x}) = \sum_{i=1}^{m}x_{i}E_{i}\bm{b}_{i}^{\T}\bm{u}(\bm{x})\bm{\gamma}_{i}\bm{\gamma}_{i}^{\T},
+\end{equation}
+in which $\bm{u}(\bm{x})$ denotes a solution to \eqref{eq:equlibrium} and $\bm{\gamma}_{i}$ depend on the geometry of the undeformed truss. 
+
+Adding \eqref{eq:stability} to \eqref{eq:prob1} leads to the following problem involving both a linear and a non-linear matrix 
+inequality\footnote{In practice it is perhaps better to replace the LMI in \eqref{eq:prob2} by the non-linear constraint $\bm{f}^{\T}\bm{u}(\bm{x})\leq c$ but we keep it to illustrate solution of a problem with more than one matrix inequality.}:
+\begin{equation}\label{eq:prob2}
+\quad
+	\begin{aligned}
+	&	\underset{\bm{x}\in\mathbb{R}^{m}}{\mbox{minimize}} \;\; \sum_{i=1}^{m}x_{i} \\
+	&	\mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+		  & \left(
+\begin{array}{cc}
+c &\bm{f}^{\T}         \\
+\bm{f} & \bm{K}(\bm{x})
+\end{array}
+\right) \succeq \bm{0} \\
+			& \bm{K}(\bm{x}) + \bm{G}(\bm{u}(\bm{x}),\bm{x}) \succeq \bm{0} \\
+			& x_{i} \geq \epsilon , \quad i=1,\ldots,m,
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+where $\epsilon$ is a small positive number introduced to avoid singularity of the stiffness matrix. \citet{Kocvara:2002} showed that a solution to this problem corresponds to a truss that will not exhibit global, linear buckling for loads
+of the form $\tau\bm{f}$, $\tau\in[0,1)$.
+
+\vskip2mm
+\noindent\textbf{3.} 
+The third example problem is an alternative formulation of problem \eqref{eq:prob2} obtained by treating the displacements as explicit variables in the optimization problem:
+\begin{equation}\nonumber
+\quad
+	\begin{aligned}
+	&	\underset{\bm{x}\in\mathbb{R}^{m},\bm{u}\in\mathbb{R}^{n}}{\mbox{minimize}} \;\; \sum_{i=1}^{m}x_{i} \\
+	&	\mbox{subject to} \;
+	\left\{
+		\begin{aligned}
+		  & \bm{f}^{\T}\bm{u} \leq c \\
+		  & \bm{K}(\bm{x})\bm{u} = \bm{f} \\
+			& \bm{K}(\bm{x}) + \bm{G}(\bm{u},\bm{x}) \succeq \bm{0} \\
+			& x_{i} \geq \epsilon , \quad i=1,\ldots,m.
+		\end{aligned}
+		\right.
+	\end{aligned}
+\end{equation}
+In this formulation, the upper bound on the compliance is a linear constraint, the equilibrium equation a set of bilinear equality constraints,
+and the stability constraint is a BMI.
+
+\vskip 5mm
+\noindent To see how these problems can be solved with \texttt{fminsdp}, and what optimized designs might look like, please check out the Matlab codes found in the \texttt{examples}-folder.
+
+
+\newpage
+\bibliographystyle{../../../spbasic}
+\bibliography{references}
+
+\end{document}
