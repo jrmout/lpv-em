@@ -18,10 +18,12 @@ After this, to test the LPV-EM algorithm in the MATLAB command window run
 ```
 $ demo_gui_mix_lds_inv_max
 ```
-and draw some trajectories on it. After each trajectory is drawn, the optimal model parameters will be recomputed. You should get something like this
-![Exemplary LPV-EM output](plot/lpv_em.png)
+and draw some trajectories on it. After each trajectory is drawn, the optimal model parameters will be recomputed. You can watch a video of this demo running <a href="https://www.youtube.com/watch?v=ojAhun_1_uQ">here</a>. It looks like this
+<a href="https://www.youtube.com/watch?v=92Xg3rFH8ag&t=22s">![Exemplary LPV-EM output](plot/lpv_em.png)</a>
 
-The repo also provides additional alternative solutions:
+An extension of this model to multiple attractors reached in a sequence can be found <a href="https://www.youtube.com/watch?v=92Xg3rFH8ag&t=22s">here</a>.
+
+The repository also provides other alternative solutions:
 - 'demo_gui_mix_lds.m' considers a standard mixture of linear dynamical systems and tries to solve the estimation problem relying on nonconvex problems. As a result it might get stuck into local minima. 
-- 'demo_gui_mix_inv_lds.m' considers a mixture of inverse linear dynamcal systems and therefore remains convex. However, the inverse formulation might produce inaccurate results. 
+- 'demo_gui_mix_inv_lds.m' considers a mixture of inverse linear dynamical systems and therefore remains convex. However, the inverse formulation might produce inaccurate results and the LPV-EM algorithm is preferable. 
 - demos without gui: 'demo_lds.m' (1 single DS), 'demo_inv_lds.m' (1 single inverse DS), 'demo_mix_lds.m' (mixture DS), 'demo_mix_inv_lds.m' (mixture inverse DS), 'demo_mix_lds_inv_max.m' (LPV-EM algorithm),
