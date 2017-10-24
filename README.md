@@ -2,7 +2,7 @@
 This repository provides MATLAB code to estimate stable dynamical systems (DS) from data. It was tested only in MATLAB 2016a but it should be compatible with any modern MATLAB version.
 It uses <a href="https://yalmip.github.io/">YALMIP</a> as optimization interface and includes the <a href="https://github.com/sqlp/sedumi">sedumi</a> solver as submodule, but you can use any other solver of your choice supported by YALMIP (check <a href="https://yalmip.github.io/allsolvers/">here</a> for a list of supported solvers). 
 For nonconvex problems it relies on <a href="https://de.mathworks.com/matlabcentral/fileexchange/43643-fminsdp">FMINSDP</a>.
-If you use this code for your research please cite [this paper](https://infoscience.epfl.ch/record/231069/files/seq_learning.pdf)
+If you use this code for your research please cite [this paper](http://proceedings.mlr.press/v78/medina17a/medina17a.pdf)
 ```
 J. Medina and A. Billard, 'Learning Stable Task Sequences from Demonstration with Linear Parameter Varying Systems and Hidden Markov Models'. In Conference on Robot Learning (CoRL), Mountain View, U.S.A., 2017.' 
 ```
