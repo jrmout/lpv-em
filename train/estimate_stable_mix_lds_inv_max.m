@@ -76,6 +76,9 @@ d=size(data,1)/2;
 if ~isfield(options, 'c_reg')
     options.c_reg = 1e-3;
 end
+if ~isfield(options, 'c_reg_inv')
+    options.c_reg_inv = 1e-1;
+end
 if ~isfield(options, 'warning')
     options.warning = 0;
 end

@@ -1,4 +1,4 @@
-function [A_inv, x_attractor]=estimate_stable_inv_lds(data, varargin)
+function lambda = estimate_stable_inv_lds(data, ~, varargin)
 %   ESTIMATE_STABLE_INV_LDS fits a stable single linear dynamical system 
 %   inverting the estimation problem. Instead of considering the standard model
 %       x_dot = A*x + b = -A (x - x_attractor)
@@ -156,8 +156,8 @@ if strcmp(options.solver, 'fmincon') || strcmp(options.solver, 'fminsdp')
     A_inv = -A_inv_neg;
 else
     %% YALMIP SQP solvers
-    if ~isfield(options, 'eps_constraints')
-        options.c_reg = 1e-3;
+    if ~isfield(options, 'c_reg_inv')
+        options.c_reg_inv = 1e-1;
     end
     if ~isfield(options, 'warning')
         options.warning = 0;
@@ -179,7 +179,7 @@ else
     C=[error == -A_inv*data(d+1:2*d,:) + ...
                                    repmat(x_star,1,size(data,2))-data(1:d,:) ];
     % Lyapunov LMI setting P=I -> Pos def (nonsymmetric) matrix
-    C = C + [A_inv + A_inv' >= options.c_reg*eye(d,d)];
+    C = C + [A_inv + A_inv' >= options.c_reg_inv*eye(d,d)];
 
     % Do not estimate the bias, set it to the one specified a priori
     if isfield(options, 'attractor')
@@ -195,6 +195,6 @@ else
     if sol.problem~=0
         warning(sol.info);
     end
-    A_inv = value(A_inv);
-    x_attractor = value(x_star);
+    lambda.A_inv = value(A_inv);
+    lambda.x_attractor = value(x_star);
 end

@@ -23,6 +23,6 @@ for c=1:n_comp
                                 [1 1 length(weights(c,:))]), 2,2,1)...
                                 .*repmat(lambda.A{c},1,1,length(x));
 end
-for i=1:length(x)
+for i=1:size(x,2)
     x_dot(:,i) = sum_A(:,:,i)*(x(:,i) - lambda.x_attractor);
 end

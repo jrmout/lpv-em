@@ -23,7 +23,7 @@ x_dyn_h = streamslice(x_tmp,y_tmp,reshape(x_dot(1,:),ny,nx), ...
 hold on;
 % Plot attractor
 x_attractor_h = plot(lambda.x_attractor(1), lambda.x_attractor(2), ...
-                                       'bo', 'LineWidth', 6,'MarkerSize', 12);
+                                       'bo', 'LineWidth', 6,'MarkerSize', 6);                                   
 axis([ax.XLim ax.YLim]);
 box on;
 legend([x_dyn_h(1) x_attractor_h], 'xdot', 'attractor');

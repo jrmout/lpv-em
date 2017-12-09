@@ -161,8 +161,8 @@ if strcmp(options.solver, 'fmincon') || strcmp(options.solver, 'fminsdp')
     end
 else
     %% YALMIP SQP solvers
-    if ~isfield(options, 'c_reg')
-        options.c_reg = 1e-3;
+    if ~isfield(options, 'c_reg_inv')
+        options.c_reg_inv = 1e-3;
     end
     if ~isfield(options, 'warning')
         options.warning = 0;
@@ -184,7 +184,7 @@ else
                                     sum(weights(i,:).*(sum(error(:,:,i).^2))));
         C = C + [error(:,:,i) == -A_inv(:,:,i)*data(d+1:2*d,:) ...
                                  + repmat(x_star,1,size(data,2))-data(1:d,:) ];
-        C = C + [A_inv(:,:,i) + A_inv(:,:,i)' >= options.c_reg*eye(d,d)];
+        C = C + [A_inv(:,:,i) + A_inv(:,:,i)' >= options.c_reg_inv*eye(d,d)];
     end
 
     % Do not estimate the attractor, set it to the one specified a priori

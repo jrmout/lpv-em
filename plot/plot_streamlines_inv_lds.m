@@ -1,4 +1,6 @@
-function plot_streamlines_inv_lds(A_inv, x_attractor, limits)
+function [p_h, l_h] = plot_streamlines_inv_lds(lambda, limits)
+A_inv = lambda.A_inv;
+x_attractor = lambda.x_attractor;
 d = size(A_inv,1);
 if d~=2
     disp('This function can only be used for 2D settings.')
@@ -22,11 +24,11 @@ x_dyn_h = streamslice(x_tmp,y_tmp,reshape(x_dot(1,:),ny,nx), ...
 axis([ax.XLim ax.YLim]);
 box on;
 % Plot attractor
-x_attractor_h = plot(x_attractor(1), x_attractor(2), 'o', ...
-                                             'LineWidth', 6,'MarkerSize', 12);
+x_attractor_h = plot(x_attractor(1), x_attractor(2), 'bo', ...
+                                             'LineWidth', 6,'MarkerSize', 6);
 axis([ax.XLim ax.YLim]);
 box on;
-legend([x_dyn_h(1) x_attractor_h], 'xdot', 'attractor');
-
+l_h = legend([x_dyn_h(1) x_attractor_h], 'xdot', 'attractor');
+p_h = [x_dyn_h' x_attractor_h];
 end
 

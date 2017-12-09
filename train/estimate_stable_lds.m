@@ -1,4 +1,4 @@
-function [A_out, b_out]=estimate_stable_lds(data, varargin)
+function [lambda]=estimate_stable_lds(data, ~, varargin)
 % ESTIMATE_STABLE_LDS fits a stable linear dynamical system x_dot = A*x + b
 %   to data
 %
@@ -152,7 +152,7 @@ if strcmp(options.solver, 'fmincon') || strcmp(options.solver, 'fminsdp')
     [A_out,b_out] = unfold_lds(p_opt,d);
 else
     %% YALMIP solvers
-    if ~isfield(options, 'eps_constraints')
+    if ~isfield(options, 'c_reg')
         options.c_reg = 1e-3;
     end
     if ~isfield(options, 'warning')
@@ -181,7 +181,7 @@ else
         if (size(options.attractor,1) ~= d)
             error(['The specified attractor should have size ' d 'x1']);
         else
-            C = C + [A*options.attractor-b == zeros(d,1)];
+            C = C + [-A*options.attractor-b == zeros(d,1)];
         end
     end
 
@@ -191,6 +191,7 @@ else
         warning(sol.info);
     end
 
-    A_out = value(A);
-    b_out = value(b);
+    lambda.A = value(A);
+    lambda.b = value(b);
+    lambda.x_attractor = -lambda.A\lambda.b;
 end

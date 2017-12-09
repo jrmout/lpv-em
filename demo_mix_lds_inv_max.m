@@ -8,7 +8,7 @@ setup_stable_lds;
 % Get trajectories from mouse
 limits = [0 100 0 100];
 data = generate_mouse_data(limits);
-n_comp = 7;
+n_comp = 3;
 em_iterations = 1;
 
 % Optimization options
@@ -22,10 +22,18 @@ options.verbose = 1;                    % Verbose (0-5)
 options.warning = true;                % Display warning information
 
 % Prior for the attractor
-options.prior.mu = [0;0];
-options.prior.sigma_inv = [0.05 0; 0 0.05];
+%options.prior.mu = [0;0];
+%options.prior.sigma_inv = [0.05 0; 0 0.05];
 
 lambda = em_mix_lds_inv_max(data, n_comp, options);
 
+figure;
+
 % Plot result
-plot_streamlines_mix_lds(lambda, limits);
+[a,b] = plot_streamlines_mix_lds(lambda, limits);
+
+delete(b);
+
+% Plot weights
+plot_weights(data, lambda);
+set(gcf, 'color', 'w');
