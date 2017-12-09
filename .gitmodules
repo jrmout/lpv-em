@@ -1,9 +1,9 @@
 [submodule "util/YALMIP"]
-        path = util/YALMIP
-        url = git@github.com:yalmip/YALMIP
+	path = util/YALMIP
+	url = https://github.com/yalmip/YALMIP.git
 [submodule "util/sedumi"]
-        path = util/sedumi
-        url = git@github.com:sqlp/sedumi
+	path = util/sedumi
+	url = https://github.com/sqlp/sedumi.git
 [submodule "results/seds"]
-        path = util/sedumi
-        url = https://bitbucket.org/khansari/seds.git
+	path = results/seds
+	url = https://bitbucket.org/khansari/seds.git
